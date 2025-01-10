@@ -4,50 +4,60 @@ import android.app.Activity
 import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry.Registrar
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 
-
-/** FlutterAppMinimizer */
+/** FlutterAppMinimizerPlugin */
 class FlutterAppMinimizerPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
-    var activity: Activity? = null
+    private var activity: Activity? = null
+    private lateinit var channel: MethodChannel
 
-    override fun onDetachedFromActivity() {}
-
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-        onAttachedToActivity(binding)
-    }
-
-    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-        this.activity = binding.activity
-    }
-
-    override fun onDetachedFromActivityForConfigChanges() {}
-
-
-    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        val channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_app_minimizer")
+    // Called when the plugin is attached to the Flutter engine
+    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_app_minimizer")
         channel.setMethodCallHandler(this)
     }
 
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {}
-
-    companion object {
-        @JvmStatic
-        fun registerWith(registrar: Registrar) {
-            val channel = MethodChannel(registrar.messenger(), "flutter_app_minimizer")
-            val plugin = FlutterAppMinimizerPlugin()
-            plugin.activity = registrar.activity()
-            channel.setMethodCallHandler(plugin)
-        }
+    // Called when the plugin is detached from the Flutter engine
+    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
     }
 
+    // Called when the plugin is attached to an activity
+    override fun onAttachedToActivity(@NonNull binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    // Called when the activity is detached from the plugin
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
+    // Called when the activity configuration changes (e.g., screen rotation)
+    override fun onReattachedToActivityForConfigChanges(@NonNull binding: ActivityPluginBinding) {
+        onAttachedToActivity(binding)
+    }
+
+    // Called when the activity is detached for configuration changes
+    override fun onDetachedFromActivityForConfigChanges() {
+        onDetachedFromActivity()
+    }
+
+    // Handles method calls from Flutter
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
-        this.activity?.moveTaskToBack(true)
-        result.success(null)
+        when (call.method) {
+            "minimize" -> {
+                if (activity != null) {
+                    activity?.moveTaskToBack(true)
+                    result.success(null)
+                } else {
+                    result.error("NO_ACTIVITY", "Activity is not available", null)
+                }
+            }
+            else -> result.notImplemented()
+        }
     }
 }
